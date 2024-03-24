@@ -159,6 +159,7 @@ def client_connect(client, device, mqtt_topic):
 
             while True:
                 msg = dev[device["name"]].recv()
+                client.publish(F"{mqtt_topic}/LWT", "online")
                 if msg is None:
                     break
                 if len(msg) > 0:
@@ -195,6 +196,7 @@ def client_connect(client, device, mqtt_topic):
 
         except Exception as e:
             print(device["name"], "ERROR", e, file=sys.stderr)
+            client.publish(F"{mqtt_topic}/LWT", "offline", retain=True)
 
         time.sleep(57)
 
