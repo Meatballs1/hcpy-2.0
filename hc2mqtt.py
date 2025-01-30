@@ -129,7 +129,7 @@ def hc2mqtt(
     with open(devices_file, "r") as f:
         devices = json.load(f)
 
-    client = mqtt.Client(mqtt_clientname)
+    client = mqtt.Client(mqtt_clientname, clean_session=True, reconnect_on_failure=True)
 
     if mqtt_username and mqtt_password:
         client.username_pw_set(mqtt_username, mqtt_password)
