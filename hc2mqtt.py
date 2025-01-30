@@ -5,7 +5,7 @@ import json
 import ssl
 import sys
 import time
-from threading import Thread
+from threading import Thread, Lock
 
 import click
 import click_config_file
@@ -48,13 +48,15 @@ def hc2mqtt(
     debug: bool,
     ha_discovery: bool,
 ):
+    publish_lock = Lock()
 
     def on_connect(client, userdata, flags, rc):
         if rc == 5:
             print(now(), f"ERROR MQTT connection failed: unauthorized - {rc}")
         elif rc == 0:
             print(now(), f"MQTT connection established: {rc}")
-            client.publish(f"{mqtt_prefix}LWT", payload="online", qos=0, retain=True)
+            with publish_lock:
+                client.publish(f"{mqtt_prefix}LWT", payload="online", qos=0, retain=True)
             # Re-subscribe to all device topics on reconnection
             for device in devices:
                 mqtt_topic = f"{mqtt_prefix}{device['name']}"
@@ -79,7 +81,7 @@ def hc2mqtt(
                         )
                         client.subscribe(mqtt_selected_program_topic)
                 if ha_discovery:
-                    publish_ha_discovery(device, client, mqtt_topic)
+                    publish_ha_discovery(device, client, mqtt_topic, publish_lock)
         else:
             print(now(), f"ERROR MQTT connection failed: {rc}")
 
@@ -154,7 +156,7 @@ def hc2mqtt(
     for device in devices:
         mqtt_topic = mqtt_prefix + device["name"]
         thread = Thread(
-            target=client_connect, args=(client, device, mqtt_topic, domain_suffix, debug)
+            target=client_connect, args=(client, device, mqtt_topic, domain_suffix, debug, publish_lock)
         )
         thread.start()
 
@@ -165,7 +167,7 @@ global dev
 dev = {}
 
 
-def client_connect(client, device, mqtt_topic, domain_suffix, debug):
+def client_connect(client, device, mqtt_topic, domain_suffix, debug, publish_lock):
     host = device["host"]
     name = device["name"]
 
@@ -198,7 +200,8 @@ def client_connect(client, device, mqtt_topic, domain_suffix, debug):
                 if client.is_connected():
                     msg = json.dumps(state)
                     print(now(), name, f"publish to {mqtt_topic} with {msg}")
-                    client.publish(f"{mqtt_topic}/state", msg, retain=True)
+                    with publish_lock:
+                        client.publish(f"{mqtt_topic}/state", msg, retain=True)
                 else:
                     print(
                         now(),
@@ -207,10 +210,12 @@ def client_connect(client, device, mqtt_topic, domain_suffix, debug):
                     )
 
     def on_open(ws):
-        client.publish(f"{mqtt_topic}/LWT", "online", retain=True)
+        with publish_lock:
+            client.publish(f"{mqtt_topic}/LWT", "online", retain=True)
 
     def on_close(ws, code, message):
-        client.publish(f"{mqtt_topic}/LWT", "offline", retain=True)
+        with publish_lock:
+            client.publish(f"{mqtt_topic}/LWT", "offline", retain=True)
         print(now(), device["name"], "websocket closed, reconnecting...")
 
     while True:
@@ -222,7 +227,8 @@ def client_connect(client, device, mqtt_topic, domain_suffix, debug):
             dev[name].run_forever(on_message=on_message, on_open=on_open, on_close=on_close)
         except Exception as e:
             print(now(), device["name"], "ERROR", e, file=sys.stderr)
-            client.publish(f"{mqtt_topic}/LWT", "offline", retain=True)
+            with publish_lock:
+                client.publish(f"{mqtt_topic}/LWT", "offline", retain=True)
 
         time.sleep(57)
 

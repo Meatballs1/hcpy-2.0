@@ -160,7 +160,7 @@ def augment_device_features(features):
     return features
 
 
-def publish_ha_discovery(device, client, mqtt_topic):
+def publish_ha_discovery(device, client, mqtt_topic, publish_lock):
     print(f"{now()} Publishing HA discovery for {device}")
 
     device_ident = device["name"]
@@ -236,5 +236,5 @@ def publish_ha_discovery(device, client, mqtt_topic):
 
             # print(discovery_topic)
             # print(discovery_payload)
-
-            client.publish(discovery_topic, json.dumps(discovery_payload), retain=True)
+            with publish_lock:
+                client.publish(discovery_topic, json.dumps(discovery_payload), retain=True)
