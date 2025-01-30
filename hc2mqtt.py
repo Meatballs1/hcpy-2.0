@@ -88,7 +88,7 @@ def hc2mqtt(
                             )
                             client.subscribe(mqtt_selected_program_topic)
                 if ha_discovery:
-                    publish_ha_discovery(device, client, mqtt_topic)
+                    publish_ha_discovery(device, client, mqtt_topic, publish_lock)
         else:
             hcprint(f"ERROR MQTT connection failed: {rc}")
 
