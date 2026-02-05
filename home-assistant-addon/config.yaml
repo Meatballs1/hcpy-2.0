@@ -55,3 +55,6 @@ discovery:
 boot: auto
 panel_title: "HomeConnect2MQTT"
 panel_icon: mdi:washing-machine
+build:
+  context: ../
+  dockerfile: Dockerfile
